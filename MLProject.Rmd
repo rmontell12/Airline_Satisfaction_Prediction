@@ -1,0 +1,189 @@
+---
+title: "ML Project: Airline Passenger Satisfaction"
+author: "Liv Marcinkus, Giulia Neves Monteiro, and Ruthie Montella"
+date: "2024-11-12"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, comment = "")
+```
+
+Read in our dataset: 
+
+```{r}
+test_data <- read.csv('~/Desktop/Machine Learning/test.csv')
+train_data <- read.csv('~/Desktop/Machine Learning/train.csv')
+#irline_data_start <- cbind(test_data, train_data)
+airline_data_merge <- merge(test_data, train_data, by = c("X","Gender","id", "Customer.Type","Age","Type.of.Travel","Class", "Flight.Distance","Inflight.wifi.service","Departure.Arrival.time.convenient","Ease.of.Online.booking", "Gate.location","Food.and.drink","Online.boarding","Seat.comfort","Inflight.entertainment", "On.board.service","Leg.room.service","Baggage.handling", "Checkin.service", "Inflight.service", "Cleanliness","Departure.Delay.in.Minutes", "Arrival.Delay.in.Minutes","satisfaction" ),all = TRUE)     
+duplicates <- airline_data_merge[duplicated(airline_data_merge$id),]
+airline_data <- airline_data_merge[!duplicated(airline_data_merge$id),]
+
+colnames(airline_data)
+nrow(airline_data)
+
+```
+We merged our train and test data sets in order to complete ealy analysis with full data set. This led to duplicate rows under the "X" column, however the "id" column still represents our unique identifiers of each respondent. 
+
+## Inital Exploration & Summary Stats
+
+First looking at the dataset as a whole: 
+
+```{r}
+str(airline_data)
+head(airline_data)
+tail(airline_data)
+
+dim(airline_data)
+```
+
+To check the quality of the dataset we checked how many NA values are present:
+
+```{r}
+colSums(is.na(airline_data)) # 83 NA's in entire dataset 
+```
+
+To replace our NA values with 0's (since all are located in the Arrival.Delay.in.Minutes column): 
+
+```{r}
+airline_data[is.na(airline_data)] <- 0
+```
+
+
+
+### Examination of individual variables:
+
+- Looking at variables we hypothesize will be strongly related to customer satisfaction: 
+
+#### Age 
+
+```{r}
+summary(airline_data$Age)
+hist(airline_data$Age)
+```
+The plot reveals that there are no significantly over represented groups within the `Age` variable, with the highest number of responses coming from people within the range of roughly 35-55 years old. 
+
+
+#### Gender
+
+```{r}
+table(airline_data$Gender)
+```
+
+#### Customer Type - loyal or disloyal 
+
+```{r}
+table(airline_data$Customer.Type)
+# many more loyal customers than non loyal 
+```
+
+
+#### Type of Travel and Class Traveled 
+
+```{r}
+table(airline_data$Type.of.Travel) # way more travel for business than personal reasons 
+```
+```{r}
+table(airline_data$Class) 
+```
+
+
+
+
+#### Cleanliness
+
+```{r}
+table(airline_data$Cleanliness)
+hist(airline_data$Cleanliness)
+```
+
+While not used in the most conventional way, this visual allows us to visually examine the distribution of responant ratings within the `Cleanliness` variable. It enables us to easily identify that most people rated airplane cleanliness in the 3-5 range. 
+
+
+#### Flight Distance
+
+```{r}
+summary(airline_data$Flight.Distance)
+```
+
+
+#### Inflight Entertainment and Wifi Service Rating Distributions 
+
+```{r}
+hist(airline_data$Inflight.entertainment)
+```
+
+The `Inflight.entertainment` histogram reveals that in general most people are fairly satisfied with their in flight entertainment options, with 4 as the mode of the ratings. 
+
+
+```{r}
+hist(airline_data$Inflight.wifi.service)
+```
+
+The `Inflight.wifi.service` visual reveals that in flight WiFi may be an area for improvement for airlines as most respondents rated the service around 2 or 3 out of a possible 5. 
+
+
+#### CheckIn Service
+
+```{r}
+# summary(airline_data$Checkin.service)
+table(airline_data$Checkin.service)
+```
+
+
+#### Arrival Delay
+
+```{r}
+summary(airline_data$Arrival.Delay.in.Minutes)
+```
+
+The median arrival delay being 0 indicates that the vast majority of flights had no delay at all.
+
+
+#### Departure Delay
+
+```{r}
+summary(airline_data$Departure.Delay.in.Minutes)
+```
+
+The median departure delay being 0 indicates that the vast majority of flights had no delay at all.
+
+
+## Data Visualizations 
+
+
+#### Relationship between Cleanliness and Class flown:
+
+```{r}
+boxplot(airline_data$Cleanliness ~ airline_data$Class)
+```
+
+This boxplot reveals that the distribution of customers' `Cleanliness` rating somewhat differs when examined by `Class` flown. It is clear that the median cleanliness rating for business class flyers is higher than ratings of those who flew in economy plus or economy. Interestingly, there is not a similar difference reflected in the cleanliness ratings between the economy and economy plus categories. This indicates that the divide to focus on is that between the business class and the rest of the classes. 
+
+
+#### Flight Distance by Inflight Service Ratings 
+
+```{r}
+boxplot(airline_data$Flight.Distance ~ airline_data$Inflight.service)
+```
+
+We also wanted to take a look at how `Inflight.service` ratings are distributed by `Flight.Distance`. Notably, all of the ratings of 0 for in flight service correlated with longer median flight distances. This is really surprising as one would reasonably assume that longer flights would be accompanied by better in flight service, so this observation is definitely something we will further examine later in our analysis. With the exception of the 0 category, however, the remaining in flight service ratings are all relatively evenly distributed between 1 and 5, with the flight distances for each rating also being generally very similar. 
+
+
+#### Distribution of Departure Delays (in minutes)
+
+
+```{r}
+# hist(airline_data$Departure.Delay.in.Minutes)
+subset_most_vals <- airline_data$Departure.Delay.in.Minutes[airline_data$Departure.Delay.in.Minutes < 400]
+breaks <- seq(0, 400, by = 10)  # Create bins every 10 minutes
+hist(subset_most_vals, 
+     breaks = breaks,  # Use the custom breaks
+     main = "Histogram of Departure Delays", 
+     xlab = "Departure Delay (Minutes)", 
+     ylab = "Frequency")
+```
+
+In order to gain insights from this histogram of `Departure.Delay.in.Minutes` I had to perform a little bit of data manipulation. I first tried to remove only a couple of outliers but still did not have a good view of the distribution, as the x axis extended all the way to 1200 minutes, making the data not readable. My next step was to filter the data so only departure delays less than 500 minutes were visible. When this still did not produce a readable visual I filtered the results all the way down departure delays under 400 minutes. While some values were excluded from this visual, the majority of the values are still included and it allows us to visualize the general distribution of departure delays. This being said it is clear that the vast majority of flights experience no delay, and the number of flights decreases significantly as the departure delays become longer and longer. 
+
+
